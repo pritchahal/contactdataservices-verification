@@ -14,7 +14,7 @@ ContactDataServices.defaults = {
 	formattedAddress: { headingType: "h3", headingText: "Formatted address" },
 	editAddressText: "Edit address",
 	searchAgainText: "Search again",
-	useAddressEnteredText: "<em>Use address entered</em>"
+	useAddressEnteredText: "<em>Enter address manually</em>"
 };
 
 // Constructor method event listener (pub/sub type thing)
@@ -87,16 +87,21 @@ ContactDataServices.ua = {
 // Generate the URLs for the various requests
 ContactDataServices.urls = {
 	endpoint: "http://int-test-01/capture/address/v2/search",
+	endpointV1: "http://int-test-01/capture/v1/verify-address/text",
 	construct: {
 		address: {
 			// Construct the Search URL by appending query, country & take
-			search: function(instance){
-				var url = ContactDataServices.urls.endpoint;
-				url += "?query=" + instance.currentSearchTerm;
+			search: function(instance, endpoint, searchTerm){
+				var url = endpoint || ContactDataServices.urls.endpoint;
+				url += "?query=" + (searchTerm || instance.currentSearchTerm);
 				url += "&country=" + instance.currentCountryCode;
 				url += "&take=" + (instance.maxSize || instance.picklist.maxSize);
 
 				return url;
+			},
+			// Construct a search URL for the verification step (basically using the V1 endpoint)
+			verification: function(instance, searchTerm){
+				return ContactDataServices.urls.construct.address.search(instance, ContactDataServices.urls.endpointV1, searchTerm);
 			}
 		}
 	},
@@ -170,6 +175,7 @@ ContactDataServices.address = function(options){
         e = e.which || e.keyCode;
         if (e === 38/*Up*/ || e === 40/*Down*/ || e === 13/*Enter*/) {
             instance.picklist.keyup(e);
+            return;
         }
 
 		instance.currentSearchTerm = instance.input.value;
@@ -182,12 +188,17 @@ ContactDataServices.address = function(options){
 				instance.request.currentRequest.abort();
 			}
 
+			// Don't employ the typedown search if we're in Verification mode
+			if(instance.verification.active){
+				return;
+			}
+
 			// Fire an event before a search takes place
 			instance.events.trigger("pre-search", instance.currentSearchTerm);
 
 			// Construct the new Search URL
 			var url = ContactDataServices.urls.construct.address.search(instance);
-
+			
 			// Store the last search term
 			instance.lastSearchTerm = instance.currentSearchTerm;	
 
@@ -252,6 +263,69 @@ ContactDataServices.address = function(options){
 
 		// Initiate a new Format request
 		instance.request.get(instance.currentFormatUrl, instance.result.show);
+	};
+
+	instance.verification = {
+		search: function(url){
+			// Trigger an event
+			instance.events.trigger("pre-verification-search", url);
+
+			// Construct the format URL
+			instance.currentFormatUrl = url;
+			instance.request.get(instance.currentFormatUrl, instance.verification.result);
+		},
+		result: function(response){
+			// Trigger an event
+			instance.events.trigger("post-verification-search", response);
+
+			if(response && response.verifylevel){
+				var verifyLevel = response.verifylevel;
+
+				switch(verifyLevel.toLowerCase()) {
+					case "verified":
+					case "interactionrequired":
+						
+						var inputData = {
+							address: []
+						};
+
+						if(response.fields && response.fields.length > 0){
+							// Construct a formatted address object							
+							for(var i = 0; i < response.fields.length; i++){
+								var key = "addressLine" + (i + 1);
+								var lineObject = {};
+								lineObject[key] = response.fields[i].content;
+								inputData.address.push(lineObject);
+							}							
+						}
+						
+						instance.result.show(inputData);
+						break;
+					case "premisespartial":
+					case "streetpartial":
+					case "mulitple":
+						//response.prompt
+						// add prompt above input
+						// change picklist options with results
+						// on click do the same again, checking the status
+						
+						// Create an items object to give to the picklist
+						if(response.results && response.results.length > 0){
+							// Set the placeholder of the input to the prompt from the response
+							instance.input.value = "";
+							instance.input.placeholder = response.prompt;
+
+							var items = { results: [] };
+							for(var j = 0; j < response.results.length; j++){
+								items.results.push({ suggestion: response.results[j].text });
+							}
+							instance.picklist.show(items);
+							instance.input.focus();
+						}						
+						break;
+				}
+			}			
+		}
 	};	
 
 	instance.picklist = {
@@ -338,9 +412,15 @@ ContactDataServices.address = function(options){
 					address: []
 				};
 
-				if(instance.currentSearchTerm){
+				// Use the current search term
+				var inputAddress = instance.currentSearchTerm;
+				// Unless we're in Verification mode and refining, then take the one they selected from the picklist
+				if(instance.verification.active){
+					inputAddress = instance.picklist.pickedAddress;
+				}
+				if(inputAddress){
 					// Try and split into lines by using comma delimiter
-					var lines = instance.currentSearchTerm.split(",");
+					var lines = inputAddress.split(",");
 					if(lines.length > 0){
 						for(var i = 0; i < lines.length; i++){
 							var key = "addressLine" + (i + 1);
@@ -348,10 +428,24 @@ ContactDataServices.address = function(options){
 							lineObject[key] = lines[i];
 							inputData.address.push(lineObject);
 						}
+
+						// Pad with additional blank fields if needed
+						var maxLines = 7;
+						var additionalLinesNeeded = maxLines - lines.length;
+						if(additionalLinesNeeded > 0){
+							var counterStart = maxLines - additionalLinesNeeded;
+							for(var j = counterStart; j < maxLines; j++){
+								var key1 = "addressLine" + (j + 1);
+								var lineObject1 = {};
+								lineObject1[key1] = "";
+								inputData.address.push(lineObject1);
+							}
+						}
 					}
 				}
 				
 				instance.result.show(inputData);
+				instance.result.editAddressManually();
 			}
 		},
 		// Create the picklist container and inject after the input
@@ -462,6 +556,10 @@ ContactDataServices.address = function(options){
 		checkEnter: function(){
 			if(instance.picklist.currentItem){
 				instance.picklist.pick(instance.picklist.currentItem);
+			} else if(instance.verification.active){
+				// Append the original result to the premise partial info
+				var originalResult = instance.picklist.items[0].suggestion;
+				instance.picklist.pick({ innerText: "Apt " + instance.currentSearchTerm + " " + originalResult });
 			}
 		},
 		// How to handle a picklist selection				
@@ -469,8 +567,19 @@ ContactDataServices.address = function(options){
 			// Fire an event when an address is picked
 			instance.events.trigger("post-picklist-selection", item);
 			
-			// Get a final address using picklist item
-			instance.format(item.getAttribute("format"));
+			// Store the address picked from the picklist
+			instance.picklist.pickedAddress = item.innerText;
+
+			// Direct any USA or CAN selections through the V1 verification search
+			if(instance.currentCountryCode.toLowerCase() === "usa" || instance.currentCountryCode.toLowerCase() === "can"){
+				// Construct the new verification Search URL
+				var url = ContactDataServices.urls.construct.address.verification(instance, item.innerText);
+				instance.verification.active = true;
+				instance.verification.search(url);
+			} else {
+				// Get a final address using picklist item
+				instance.format(item.getAttribute("format"));
+			}
 		}
 	};
 
@@ -594,8 +703,10 @@ ContactDataServices.address = function(options){
 			link.addEventListener("click", instance.reset);
 		},
 		editAddressManually: function(event){
-			event.preventDefault();
-			
+			if(event){
+				event.preventDefault();
+			}
+
 			// Remove 'edit address link'
 			instance.result.formattedAddress.querySelector(".edit-address-link").classList.add("hidden");
 
@@ -662,13 +773,16 @@ ContactDataServices.address = function(options){
 		}
 		// Enable searching
 		instance.enabled = true;
+		// Switch back to typedown mode
+		instance.verification.active = false;
 		// Hide formatted address
 		instance.result.hide();
 		// Show search input
 		instance.toggleVisibility(instance.input.parentNode);
 		// Apply focus to input
 		instance.input.focus();
-
+		// Set a placeholder for the input
+		instance.input.setAttribute("placeholder", instance.placeholderText);
 		// Fire an event after a reset
 		instance.events.trigger("post-reset");
 	};
@@ -718,10 +832,14 @@ ContactDataServices.address = function(options){
 
 			instance.request.currentRequest.onerror = function() {
 			  // There was a connection error of some sort
+			  // Hide the inline search spinner
+				instance.searchSpinner.hide();
 			};
 
 			instance.request.currentRequest.ontimeout = function() {
-			  // There was a connection timeout			  
+			  // There was a connection timeout	
+			  // Hide the inline search spinner
+				instance.searchSpinner.hide();		  
 			};
 
 			instance.request.currentRequest.send();
