@@ -1,17 +1,21 @@
-# Contact Data Services
+# Contact Data Services - Verification
 
-[![GitHub version](https://badge.fury.io/gh/ExperianDataQuality%2Fcontactdataservices.svg)](http://badge.fury.io/gh/ExperianDataQuality%2Fcontactdataservices)
-[![Dependency Status](https://david-dm.org/ExperianDataQuality/contactdataservices.svg)](https://david-dm.org/ExperianDataQuality/contactdataservices)
-[![Dependency Status](https://david-dm.org/ExperianDataQuality/contactdataservices/dev-status.svg)](https://david-dm.org/ExperianDataQuality/contactdataservices#info=devDependencies)
-[![Build Status](https://travis-ci.org/experiandataquality/contactdataservices.svg?branch=master)](https://travis-ci.org/experiandataquality/contactdataservices)
+[![GitHub version](https://badge.fury.io/gh/ExperianDataQuality%2Fcontactdataservices-verification.svg)](http://badge.fury.io/gh/ExperianDataQuality%2Fcontactdataservices-verification)
+[![Dependency Status](https://david-dm.org/ExperianDataQuality/contactdataservices-verification.svg)](https://david-dm.org/ExperianDataQuality/contactdataservices-verification)
+[![Dependency Status](https://david-dm.org/ExperianDataQuality/contactdataservices-verification/dev-status.svg)](https://david-dm.org/ExperianDataQuality/contactdataservices-verification#info=devDependencies)
+[![Build Status](https://travis-ci.org/experiandataquality/contactdataservices-verification.svg?branch=master)](https://travis-ci.org/experiandataquality/contactdataservices-verification)
 
 This repo contains sample code for integrating with Experian Data Quality's Contact Data Services. Currently set up for typedown address searching for GBR, USA, AUS, NZL and FRA.
+
+## Verification
+
+For USA and CAN address searches addresses picked from the 'picklist' are additionally passed through a **verification** engine to ascertain the sub-premise information.
 
 ## Usage
 
 #### Prerequisites
 
-- Include the Contact Data Services [JavaScript file](https://github.com/experiandataquality/contactdataservices/blob/master/dist/js/contact-data-services.min.js) in your form page.
+- Include the Contact Data Services [JavaScript file](https://github.com/experiandataquality/contactdataservices-verification/blob/master/dist/js/contact-data-services.min.js) in your form page.
 - Have a token to hand (You would have received this from your Experian Data Quality account manager).
 
 #### Integration
@@ -70,7 +74,7 @@ Make sure Node and the Grunt CLI are both installed.
 
 Then:
 
-0. Fork this repo (`https://github.com/ExperianDataQuality/contactdataservices`).
+0. Fork this repo (`https://github.com/ExperianDataQuality/contactdataservices-verification`).
 0. Run `npm install` to get the configured Grunt packages.
 0. Check the Grunt tasks to ensure your changes are built.
 0. Push your changes and, when ready, make a pull request for them to be added to master.
