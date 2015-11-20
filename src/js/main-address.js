@@ -135,12 +135,7 @@ ContactDataServices.address = function(options){
 		instance.searchSpinner.hide();
 
 		// Construct the format URL
-		instance.currentFormatUrl = url;
-		
-		/* Temporary hack until Go Live*/
-		if(instance.currentFormatUrl.indexOf("https://api.edq.com") > -1){
-			instance.currentFormatUrl = instance.currentFormatUrl.replace("https://api.edq.com","http://int-test-01");
-		}
+		instance.currentFormatUrl = url;		
 
 		// Initiate a new Format request
 		instance.request.get(instance.currentFormatUrl, instance.result.show);
