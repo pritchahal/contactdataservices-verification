@@ -15,6 +15,7 @@ ContactDataServices.address = function(options){
 	instance.editAddressText = instance.editAddressText || ContactDataServices.defaults.editAddressText; 
 	instance.searchAgainText = instance.searchAgainText || ContactDataServices.defaults.searchAgainText; 
 	instance.formattedAddress = instance.formattedAddress || ContactDataServices.defaults.formattedAddress;
+	instance.setInitialFocus = instance.setInitialFocus !== false;
 	
 	// Create a new object to hold the events from the event factory
 	instance.events = new ContactDataServices.eventFactory();
@@ -46,7 +47,9 @@ ContactDataServices.address = function(options){
 			    event.preventDefault();
 			});
 			// Apply focus to input
-			instance.input.focus();
+			if (instance.setInitialFocus){
+				instance.input.focus();
+			}
 		}
 	};
 	// Main function to search for an address from an input string
